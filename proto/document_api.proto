@@ -1,0 +1,52 @@
+// This is the public API offered by your entity.
+syntax = "proto3";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/empty.proto";
+import "akkaserverless/annotations.proto";
+import "google/api/annotations.proto";
+import "google/protobuf/struct.proto";
+
+package com.lightbend.demos;
+
+
+message SetValue {
+  string tenant =1 [(akkaserverless.field).entity_key = true]; 
+  string key = 2 [(akkaserverless.field).entity_key = true];
+  google.protobuf.Struct value = 3;
+}
+
+service DocumentActionService {
+
+  rpc Set(google.protobuf.Struct) returns (google.protobuf.Struct) {
+    option (google.api.http) = { 
+      post: "/document"
+      body: "*"
+    };
+    option (akkaserverless.method).eventing.out = {
+      topic: "documents-3"
+    };       
+  }
+}
+
+service DocumentQueryService {
+  rpc UpdateDocument(google.protobuf.Struct) returns (SetValue) { // <1>
+    option (akkaserverless.method).eventing.in = { // <2>
+      topic: "documents-3"
+    };
+    option (akkaserverless.method).view.update = { // <3>
+      table: "documents",
+      transform_updates: true
+    };
+  }
+
+  rpc GetDocuments(google.protobuf.Empty) returns (stream SetValue) { // <4>
+    option (akkaserverless.method).view.query = { // <5>
+      query: "SELECT * FROM documents"
+    };
+    option (google.api.http) = { 
+      get: "/documents"
+    };
+
+  }
+}
